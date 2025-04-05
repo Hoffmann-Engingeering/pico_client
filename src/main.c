@@ -7,9 +7,6 @@
 #include "wifi.h"
 
 /** Defines **************************************************************************************/
-#define SSID "pico_test"
-#define PASSWORD "password123"
-
 /** Typedefs *************************************************************************************/
 /** Variables ************************************************************************************/
 /** Prototypes ***********************************************************************************/
@@ -21,7 +18,6 @@ int main()
     stdio_init_all();
 
     sleep_ms(5000);
-    printf("Starting Wi-Fi example\n");
 
     /** Initialise and connect to the wifi network with 10sec timeout */
     if(wifi_init(SSID, PASSWORD) != 0)
@@ -29,6 +25,7 @@ int main()
         printf("Failed to initialise Wi-Fi\n");
         return -1;
     }
+
     printf("Wi-Fi initialised\n");
 
     while (true)

@@ -1,7 +1,7 @@
 /** Includes *************************************************************************************/
 #include "wifi.h"
 /** Defines **************************************************************************************/
-#define WIFI_CONNECTION_TIMEOUT_MS  20000
+#define WIFI_CONNECTION_TIMEOUT_MS  5000
 #define WIFI_TASK_INTERVAL_MS       100
 #define WIFI_SSID_MAX_LENGTH        32
 #define WIFI_PASSWORD_MAX_LENGTH    64
@@ -23,20 +23,16 @@ typedef struct
 } WifiTask_t;
 
 /** Variables ************************************************************************************/
-WifiTask_t WifiTask = {
+static WifiTask_t WifiTask = {
     .state = WIFI_TASK_DISCONNECTED,
     .last_run_ms = 0,
+    .ssid = {0},
+    .pw = {0},
 };
 
 /** Prototypes ***********************************************************************************/
 /** Functions ************************************************************************************/
 
-/**
- * @brief Initialise the Wi-Fi chip and connect to the network
- * @param ssid The SSID of the Wi-Fi network to connect to
- * @param password The password of the Wi-Fi network to connect to
- * @return 0 on success, -1 on failure
- */
 int wifi_init(const char *ssid, const char *password)
 {
     /** Ensure that the ssid and password are not NULL */
@@ -66,15 +62,6 @@ int wifi_init(const char *ssid, const char *password)
     return 0;
 }
 
-/**
- * @brief The wifi task is used to handle the wifi connection. Connecting and reconnecting
- *
- * The wifi task is used to handle the wifi connection. Connecting and reconnecting
- * as needed. It is called from the main loop and should be run in a separate thread.
- *
- * @return int 0 on success, -1 on failure
- *
- */
 int wifi_task(void)
 {
 
@@ -96,7 +83,7 @@ int wifi_task(void)
     /** Get the current wifi status */
     int currentWifiStatus = cyw43_tcpip_link_status(&cyw43_state, CYW43_ITF_STA);
 
-    printf("Current Wi-Fi status: %d\n", currentWifiStatus);
+    /** Keep track of connection timeout */
     static uint32_t connectionTimeoutMs = 0;
 
     switch (WifiTask.state)
@@ -106,6 +93,9 @@ int wifi_task(void)
         /** WiFi is disconnected let's reconnect */
         char *ssid = WifiTask.ssid;
         char *pw = WifiTask.pw;
+
+        /** Enable station mode again */
+        cyw43_arch_enable_sta_mode();
 
         if (currentWifiStatus != CYW43_LINK_UP)
         {
@@ -133,12 +123,14 @@ int wifi_task(void)
         {
             // Failed to connect
             printf("Failed to connect to Wi-Fi\n");
+            cyw43_arch_disable_sta_mode();
             WifiTask.state = WIFI_TASK_DISCONNECTED;
         }
         else if (currentWifiStatus == CYW43_LINK_BADAUTH)
         {
             /** Bad authentication */
             printf("Bad auth\n");
+            cyw43_arch_disable_sta_mode();
             WifiTask.state = WIFI_TASK_DISCONNECTED;
         }
 
@@ -151,17 +143,19 @@ int wifi_task(void)
         {
             /** Timeout reached */
             printf("Connection timeout\n");
+            /** Reset station mode just incase it gets locked up */
+            cyw43_arch_disable_sta_mode();
             WifiTask.state = WIFI_TASK_DISCONNECTED;
         }
         break;
 
     case WIFI_TASK_CONNECTED:
-        printf("Wi-Fi connected\n");
         /** Check if we are still connected */
         if (currentWifiStatus != CYW43_LINK_UP)
         {
-            // Disconnected
+            /** Disconnected */
             printf("Disconnected from Wi-Fi\n");
+            cyw43_arch_disable_sta_mode();
             WifiTask.state = WIFI_TASK_DISCONNECTED;
         }
         break;
@@ -173,18 +167,3 @@ int wifi_task(void)
 
     return 0;
 }
-
-// if (new_status == CYW43_LINK_NONET) {
-//     new_status = CYW43_LINK_JOIN;
-//     err = cyw43_arch_wifi_connect_bssid_async(ssid, bssid, pw, auth);
-//     if (err) return err;
-// }
-// if (new_status != status) {
-//     status = new_status;
-//     CYW43_ARCH_DEBUG("connect status: %s\n", cyw43_tcpip_link_status_name(status));
-// }
-// if (time_reached(until)) {
-//     return PICO_ERROR_TIMEOUT;
-// }
-// // Do polling
-// cyw43_arch_poll();

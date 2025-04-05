@@ -64,3 +64,9 @@ target_link_libraries(pico_client
 
 pico_add_extra_outputs(pico_client)
 
+# Add WIFI credentials as compile definitions
+add_compile_definitions(
+        SSID="pico_test"
+        PASSWORD="password123"
+)
+
