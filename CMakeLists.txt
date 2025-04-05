@@ -37,6 +37,7 @@ pico_sdk_init()
 
 add_executable(pico_client 
         src/client.c
+        src/wifi.c
         src/main.c )
 
 pico_set_program_name(pico_client "pico_client")
