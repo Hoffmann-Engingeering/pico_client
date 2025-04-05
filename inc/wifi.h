@@ -8,5 +8,7 @@
 /** Variables ************************************************************************************/
 /** Prototypes ***********************************************************************************/
 /** Functions ************************************************************************************/
-int wifi_init(const char *ssid, const char *password, uint32_t timeout_ms);
+int wifi_init(const char *ssid, const char *password);
+int wifi_task(void);
+
 #endif /* _WIFI_H_ */

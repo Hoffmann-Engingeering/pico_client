@@ -3,6 +3,7 @@
 /** Defines **************************************************************************************/
 #define SERVER_PORT 4242
 #define CLINET_POLL_TIME_S 10
+
 /** Typedefs *************************************************************************************/
 /** Variables ************************************************************************************/
 /** Prototypes ***********************************************************************************/
@@ -14,20 +15,23 @@ static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t
 static void _client_err(void *arg, err_t err);
 static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err);
 
-int client_init(client_t *client, const char *ip_address) {
+int client_init(client_t *client, const char *ip_address)
+{
     // Perform initialisation
-    if(client == NULL) {
+    if (client == NULL)
+    {
         return -1;
     }
     /** Initialise client with the server ip address */
     return ip4addr_aton(ip_address, &client->remote_addr);
 }
 
-
-static int _client_open(client_t *client) {
+static int _client_open(client_t *client)
+{
     client->tcp_pcb = tcp_new_ip_type(IP_GET_TYPE(&client->remote_addr));
 
-    if(!client->tcp_pcb) {
+    if (!client->tcp_pcb)
+    {
         printf("Failed to setup the pcb");
         return -1;
     }
@@ -51,9 +55,8 @@ static int _client_open(client_t *client) {
     return 0;
 }
 
-
-static err_t _client_poll(void *arg, struct tcp_pcb *tpcb) { return 0;}
-static err_t _client_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) { return 0;}
-static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) { return 0;}
+static err_t _client_poll(void *arg, struct tcp_pcb *tpcb) { return 0; }
+static err_t _client_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) { return 0; }
+static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) { return 0; }
 static void _client_err(void *arg, err_t err) { /** Nothing atm*/ }
-static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err) { return 0;}
+static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err) { return 0; }
