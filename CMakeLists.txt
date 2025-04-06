@@ -37,6 +37,7 @@ pico_sdk_init()
 
 add_executable(pico_client 
         src/client.c
+        src/wifi.c
         src/main.c )
 
 pico_set_program_name(pico_client "pico_client")
@@ -62,4 +63,10 @@ target_link_libraries(pico_client
         )
 
 pico_add_extra_outputs(pico_client)
+
+# Add WIFI credentials as compile definitions
+add_compile_definitions(
+        SSID="pico_test"
+        PASSWORD="password123"
+)
 
