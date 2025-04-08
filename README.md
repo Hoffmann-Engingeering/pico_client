@@ -15,7 +15,6 @@ This project is designed for the Raspberry Pi Pico and uses the Raspberry Pi Pic
 1. Clone this repository to your local machine:
    ```bash
    git clone https://github.com/Hoffmann-Engingeering/pico_client.git
-   cd pico_client
    ```
 2. Open VS Code.
 3. Click File->Open Folder.
