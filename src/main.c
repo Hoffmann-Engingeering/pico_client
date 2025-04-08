@@ -32,6 +32,7 @@ int main()
     /** Initialise the stdio library */
     stdio_init_all();
 
+    /** Initial sleep to give the user time to plug in an connect to the COM port */
     sleep_ms(5000);
 
     /** Initialise the LED */
@@ -53,6 +54,16 @@ int main()
 
     printf("Wi-Fi initialised\n");
 
+    /** Initialise the client with the server IP address */
+    client_t client;
+    if (client_init(&client, TCP_SERVER_IP) != 0)
+    {
+        printf("Failed to initialise client\n");
+        return -1;
+    }
+
+    printf("Client initialised\n");
+
     while (true)
     {
         /** Run the wifi task to check if we are connected */
@@ -60,6 +71,12 @@ int main()
 
         /** Blink led to show that we are alive */
         led_task();
+
+        /** Run the client task to check if we are connected */
+        if (client_task(&client) != 0)
+        {
+            printf("Failed to run client task\n");
+        }
 
         /** Sleep for 10ms */
         sleep_ms(10);

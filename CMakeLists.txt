@@ -68,5 +68,6 @@ pico_add_extra_outputs(pico_client)
 add_compile_definitions(
         SSID="pico_test"
         PASSWORD="password123"
+        TCP_SERVER_IP="192.168.137.1"
 )
 
