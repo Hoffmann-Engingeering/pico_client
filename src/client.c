@@ -4,6 +4,7 @@
 #define SERVER_PORT 4242
 #define CLIENT_POLL_TIME_S 10
 #define CLIENT_TASK_TIMEOUT_MS 100
+#define CLIENT_CONNECT_TIMEOUT_MS 4000
 
 /** Typedefs *************************************************************************************/
 /** Variables ************************************************************************************/
@@ -27,14 +28,6 @@ int client_init(client_t *client, const char *ip_address)
 
     /** Initialise client with the server ip address */
     _client_ip_string_to_ip_addr(ip_address, &client->remote_addr);
-
-    /** Create a new TCP PCB (Protocol Control Block) for the client */
-    client->tcp_pcb = tcp_new_ip_type(IP_GET_TYPE(&client->remote_addr));
-    if (client->tcp_pcb == NULL)
-    {
-        printf("Failed to create new TCP PCB\n");
-        return -1;
-    }
 
     /** Initialise the client state */
     client->state = CLIENT_DISCONNECTED;
@@ -62,8 +55,8 @@ int client_task(client_t *client)
     {
         return 0;
     }
-    /** Update the last run time */
-    timeLastRunMs = currentTimeMs;
+    /** Update the last run time and catch the roll-over */
+    timeLastRunMs = currentTimeMs < timeLastRunMs ? UINT32_MAX - timeLastRunMs + currentTimeMs : currentTimeMs;
 
     /** poll the cwy43 arch to process any incoming data */
     cyw43_arch_poll();
@@ -80,11 +73,11 @@ int client_task(client_t *client)
             return 0;
         }
         else if (timeoutMs <= 0)
-        {   
+        {
             _client_open(client) != ERR_OK;
-            timeoutMs = 2000;
+            timeoutMs = CLIENT_CONNECT_TIMEOUT_MS;
         }
-    
+
         break;
     case CLIENT_CONNECTED:
         /** If the client is connected, do nothing */
@@ -99,6 +92,13 @@ int client_task(client_t *client)
 
 static int _client_open(client_t *client)
 {
+    /** Create a new TCP PCB (Protocol Control Block) for the client */
+    client->tcp_pcb = tcp_new_ip_type(IP_GET_TYPE(&client->remote_addr));
+    if (client->tcp_pcb == NULL)
+    {
+        printf("Failed to create new TCP PCB\n");
+        return -1;
+    }
     
     if (!client->tcp_pcb)
     {
@@ -129,11 +129,61 @@ static int _client_open(client_t *client)
 
 static err_t _client_poll(void *arg, struct tcp_pcb *tpcb) { return 0; }
 static err_t _client_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) { return 0; }
-static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err) { return 0; }
-static void _client_err(void *arg, err_t err) { /** Nothing atm*/ }
-static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
+static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     client_t *client = (client_t *)arg;
+    if (err != ERR_OK)
+    {
+        printf("Error receiving data\n");
+        return err;
+    }
+
+    if (p == NULL)
+    {
+        printf("Connection closed\n");
+        tcp_abort(tpcb);
+        client->state = CLIENT_DISCONNECTED;
+        return ERR_ABRT;
+    }
+
+    /**
+     * Print the incoming data to the console.
+     * @note: This is a simple example and should be replaced with your own code to handle the incoming data.
+     *        The payload is a pointer to the data in the pbuf, and the length of the data is in p->len.
+     *        The payload is not null terminated, so you need to handle it accordingly.
+     *
+     * @warning: This will only work well for null terminated strings.
+     *
+     */
+    void *payload = p->payload;
+    uint16_t len = p->len;
+    char buffer[100] = {0};
+    sprintf(buffer, "%.*s", len, (char *)payload); // Copy the payload to a buffer
+    printf("Received data: %s\n", buffer);
+
+    /** Free the pbuf */
+    pbuf_free(p);
+
+    return ERR_OK;
+}
+
+static void _client_err(void *arg, err_t err) { /** Nothing atm*/ }
+
+static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
+{
+    /** NULL check */
+    if (arg == NULL)
+    {
+        return ERR_ARG;
+    }
+
+    client_t *client = (client_t *)arg;
+
+    if(client->state == CLIENT_CONNECTED)
+    {
+        return ERR_OK; // Already connected
+    }
+
     client->state = CLIENT_CONNECTED;
     printf("Client connected\n");
 }
