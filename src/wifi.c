@@ -1,19 +1,12 @@
 /** Includes *************************************************************************************/
 #include "wifi.h"
 /** Defines **************************************************************************************/
-#define WIFI_CONNECTION_TIMEOUT_MS  5000
-#define WIFI_TASK_INTERVAL_MS       100
-#define WIFI_SSID_MAX_LENGTH        32
-#define WIFI_PASSWORD_MAX_LENGTH    64
+#define WIFI_CONNECTION_TIMEOUT_MS 5000
+#define WIFI_TASK_INTERVAL_MS 100
+#define WIFI_SSID_MAX_LENGTH 32
+#define WIFI_PASSWORD_MAX_LENGTH 64
 
 /** Typedefs *************************************************************************************/
-typedef enum
-{
-    WIFI_TASK_DISCONNECTED = 0,
-    WIFI_TASK_CONNECTING,
-    WIFI_TASK_CONNECTED,
-} WifiTaskState_t;
-
 typedef struct
 {
     WifiTaskState_t state;
@@ -166,4 +159,9 @@ int wifi_task(void)
     }
 
     return 0;
+}
+
+WifiTaskState_t wifi_get_state(void)
+{
+    return WifiTask.state;
 }

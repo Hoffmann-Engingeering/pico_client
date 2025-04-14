@@ -4,6 +4,13 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 /** Defines **************************************************************************************/
+typedef enum
+{
+    WIFI_TASK_DISCONNECTED = 0,
+    WIFI_TASK_CONNECTING,
+    WIFI_TASK_CONNECTED,
+} WifiTaskState_t;
+
 /** Typedefs *************************************************************************************/
 /** Variables ************************************************************************************/
 /** Prototypes ***********************************************************************************/
@@ -28,5 +35,15 @@ int wifi_init(const char *ssid, const char *password);
  *
  */
 int wifi_task(void);
+
+/**
+ * @brief Get the WiFi task state
+ * 
+ * This function returns the current state of the WiFi task.
+ * 
+ * @return WifiTaskState_t The current state of the WiFi task.
+ * 
+ */
+WifiTaskState_t wifi_get_state(void);
 
 #endif /* _WIFI_H_ */

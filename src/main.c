@@ -69,13 +69,26 @@ int main()
         /** Run the wifi task to check if we are connected */
         wifi_task();
 
-        /** Blink led to show that we are alive */
-        led_task();
-
-        /** Run the client task to check if we are connected */
-        if (client_task(&client) != 0)
+        /** 
+         * Check if the wifi task state is connected. 
+         * LED should be on if connected and blinking if not connected.
+         */
+        if (wifi_get_state() == WIFI_TASK_CONNECTED)
         {
-            printf("Failed to run client task\n");
+            /** Set the LED on if connected */
+            pico_set_led(true);
+
+            /** Run the client task to check if we are connected */
+            if (client_task(&client) != 0)
+            {
+                printf("Failed to run client task\n");
+            }
+
+        } else {
+            /** Set the client task to disconnected */
+            client.state = CLIENT_DISCONNECTED;
+            /** Blink the LED if not connected */
+            led_task();
         }
 
         /** Sleep for 10ms */
