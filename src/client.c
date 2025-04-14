@@ -10,7 +10,7 @@
 /** Variables ************************************************************************************/
 /** Prototypes ***********************************************************************************/
 int _client_ip_string_to_ip_addr(const char *ip_str, ip_addr_t *ip_addr);
-/** Functions ************************************************************************************/
+/** Private Function Prototypes ******************************************************************/
 static int _client_open(client_t *client);
 static err_t _client_poll(void *arg, struct tcp_pcb *tpcb);
 static err_t _client_sent(void *arg, struct tcp_pcb *tpcb, u16_t len);
@@ -18,6 +18,7 @@ static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t
 static void _client_err(void *arg, err_t err);
 static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err);
 
+/** Function Definitions *************************************************************************/
 int client_init(client_t *client, const char *ip_address)
 {
     // Perform initialisation
@@ -35,13 +36,6 @@ int client_init(client_t *client, const char *ip_address)
     return 0;
 }
 
-/**
- * @brief Run the client task
- * This function is called in the main loop to run the client task. It checks if the client is connected and if not, it opens the client connection.
- * It also runs the lwIP stack to process any incoming data and send any outgoing data.
- * @param client Pointer to the client structure.
- * @return int 0 on success, -1 on failure.
- */
 int client_task(client_t *client)
 {
     if (client == NULL)
@@ -90,8 +84,23 @@ int client_task(client_t *client)
     return 0;
 }
 
+/**
+ * @brief Opens a TCP connection to the server.
+ * @param client Pointer to the client structure.
+ * @return int Returns 0 on success, -1 on failure.
+ * @note This function creates a new TCP PCB (Protocol Control Block) for the client and sets up the necessary callbacks.
+ *       It also initiates the connection to the server.
+ *       If the connection is successful, the _client_connected callback will be triggered.
+ */
 static int _client_open(client_t *client)
 {
+    /** Check if the client tcp control block is NULL */
+    if (client->tcp_pcb != NULL)
+    {
+        /** Abort the existing connection */
+        tcp_abort(client->tcp_pcb); /** This will free the memory */
+    }
+
     /** Create a new TCP PCB (Protocol Control Block) for the client */
     client->tcp_pcb = tcp_new_ip_type(IP_GET_TYPE(&client->remote_addr));
     if (client->tcp_pcb == NULL)
@@ -99,7 +108,7 @@ static int _client_open(client_t *client)
         printf("Failed to create new TCP PCB\n");
         return -1;
     }
-    
+
     if (!client->tcp_pcb)
     {
         printf("Failed to setup the pcb");
@@ -127,8 +136,34 @@ static int _client_open(client_t *client)
     return err;
 }
 
+/**
+ * @brief Polling function for the client.
+ * @param arg Pointer to the client structure.
+ * @param tpcb Pointer to the TCP protocol control block.
+ * @return err_t Error code.
+ * @note This function is called periodically to check the status of the connection.
+ */
 static err_t _client_poll(void *arg, struct tcp_pcb *tpcb) { return 0; }
+
+/**
+ * @brief Callback function for when data is sent to the server.
+ * @param arg Pointer to the client structure.
+ * @param tpcb Pointer to the TCP protocol control block.
+ * @param len Length of the data sent.
+ * @return err_t Error code.
+ * @note This function is called when data is sent to the server.
+ */
 static err_t _client_sent(void *arg, struct tcp_pcb *tpcb, u16_t len) { return 0; }
+
+/**
+ * @brief Callback function for when data is received from the server.
+ * @param arg Pointer to the client structure.
+ * @param tpcb Pointer to the TCP protocol control block.
+ * @param p Pointer to the received pbuf.
+ * @param err Error code.
+ * @return err_t Error code.
+ * @note This function is called when data is received from the server.
+ */
 static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t err)
 {
     client_t *client = (client_t *)arg;
@@ -157,18 +192,56 @@ static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t
      */
     void *payload = p->payload;
     uint16_t len = p->len;
-    char buffer[100] = {0};
-    sprintf(buffer, "%.*s", len, (char *)payload); // Copy the payload to a buffer
-    printf("Received data: %s\n", buffer);
+    uint8_t *buffer = client->buffer; /** Use the client's buffer to store the data. */
+    uint16_t offset = client->buffer_len; /** Offset to write to in the buffer. */
+    if (len > BUF_SIZE - 1)
+    {
+        /** we are full */
+        len = BUF_SIZE - 1; // Ensure we don't overflow the buffer
+    }  else if (len > 0)
+    {
+        /** Copy the data to the buffer */
+        memcpy(buffer + offset, payload, len);
+        client->buffer_len += len;
+    }
+
+    buffer[client->buffer_len] = '\0'; // Null terminate the string
 
     /** Free the pbuf */
     pbuf_free(p);
 
     return ERR_OK;
 }
+/**
+ * @brief Error callback for the client.
+ * @param arg Pointer to the client structure.
+ * @param err Error code.
+ * @return None.
+ * @note This function is called when an error occurs in the client connection.
+ */
+static void _client_err(void *arg, err_t err)
+{
+    client_t *client = (client_t *)arg;
+    if (err != ERR_OK)
+    {
+        printf("Error: %d\n", err);
+        client->state = CLIENT_DISCONNECTED;
+        tcp_abort(client->tcp_pcb);
+    }
+    else
+    {
+        printf("Client error\n");
+    }
+}
 
-static void _client_err(void *arg, err_t err) { /** Nothing atm*/ }
-
+/**
+ * * @brief Callback function for when the client is connected.
+ * * @param arg Pointer to the client structure.
+ * * @param tpcb Pointer to the TCP protocol control block.
+ * * @param err Error code.
+ * * @return err_t Error code.
+ * * @note This function is called when the client is connected to the server.
+ */
 static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
 {
     /** NULL check */
@@ -179,7 +252,7 @@ static err_t _client_connected(void *arg, struct tcp_pcb *tpcb, err_t err)
 
     client_t *client = (client_t *)arg;
 
-    if(client->state == CLIENT_CONNECTED)
+    if (client->state == CLIENT_CONNECTED)
     {
         return ERR_OK; // Already connected
     }

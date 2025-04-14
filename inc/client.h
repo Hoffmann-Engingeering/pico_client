@@ -17,6 +17,7 @@ typedef struct {
     struct tcp_pcb *tcp_pcb;
     ip_addr_t remote_addr;
     uint8_t buffer[BUF_SIZE];
+    uint16_t buffer_len;
     client_state_t state;
 } client_t;
 
