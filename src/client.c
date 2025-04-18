@@ -53,7 +53,7 @@ int client_task(client_t *client)
     timeLastRunMs = currentTimeMs < timeLastRunMs ? UINT32_MAX - timeLastRunMs + currentTimeMs : currentTimeMs;
 
     /** poll the cwy43 arch to process any incoming data */
-    cyw43_arch_poll();
+    // cyw43_arch_poll(); already ran in wifi_task
 
     /** Run the state machine */
     switch (client->state)
@@ -98,7 +98,11 @@ static int _client_open(client_t *client)
     if (client->tcp_pcb != NULL)
     {
         /** Abort the existing connection */
-        tcp_abort(client->tcp_pcb); /** This will free the memory */
+        if (ERR_OK != tcp_close(client->tcp_pcb))
+        {
+            printf("Failed to close existing connection\n");
+            return -1;
+        }
     }
 
     /** Create a new TCP PCB (Protocol Control Block) for the client */
@@ -124,10 +128,11 @@ static int _client_open(client_t *client)
 
     printf("Connecting to %s:%d\n", ipaddr_ntoa(&client->remote_addr), SERVER_PORT);
 
-    // cyw43_arch_lwip_begin/end should be used around calls into lwIP to ensure correct locking.
-    // You can omit them if you are in a callback from lwIP. Note that when using pico_cyw_arch_poll
-    // these calls are a no-op and can be omitted, but it is a good practice to use them in
-    // case you switch the cyw43_arch type later.
+    /** 
+     * @warning lwip is not thread safe so surround calls into lwip with 
+     *          cyw43_arch_lwip_begin() and cyw43_arch_lwip_end
+     */
+
     cyw43_arch_lwip_begin();
     /** The function will trigger the _client_connected callback once the client has connected */
     err_t err = tcp_connect(client->tcp_pcb, &client->remote_addr, SERVER_PORT, _client_connected);
@@ -176,7 +181,7 @@ static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t
     if (p == NULL)
     {
         printf("Connection closed\n");
-        tcp_abort(tpcb);
+        tcp_close(tpcb);
         client->state = CLIENT_DISCONNECTED;
         return ERR_ABRT;
     }
@@ -192,13 +197,14 @@ static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t
      */
     void *payload = p->payload;
     uint16_t len = p->len;
-    uint8_t *buffer = client->buffer; /** Use the client's buffer to store the data. */
+    uint8_t *buffer = client->buffer;     /** Use the client's buffer to store the data. */
     uint16_t offset = client->buffer_len; /** Offset to write to in the buffer. */
     if (len > BUF_SIZE - 1)
     {
         /** we are full */
         len = BUF_SIZE - 1; // Ensure we don't overflow the buffer
-    }  else if (len > 0)
+    }
+    else if (len > 0)
     {
         /** Copy the data to the buffer */
         memcpy(buffer + offset, payload, len);
@@ -222,16 +228,10 @@ static err_t _client_recv(void *arg, struct tcp_pcb *tpcb, struct pbuf *p, err_t
 static void _client_err(void *arg, err_t err)
 {
     client_t *client = (client_t *)arg;
-    if (err != ERR_OK)
-    {
-        printf("Error: %d\n", err);
-        client->state = CLIENT_DISCONNECTED;
-        tcp_abort(client->tcp_pcb);
-    }
-    else
-    {
-        printf("Client error\n");
-    }
+    printf("Error: %d\n", err);
+    // tcp_abort(client->tcp_pcb); /** Abort kept giving recurring err_call with -13 */
+    tcp_close(client->tcp_pcb); /** close the connection */
+    client->state = CLIENT_DISCONNECTED;
 }
 
 /**
