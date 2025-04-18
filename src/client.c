@@ -48,12 +48,21 @@ int client_task(client_t *client)
     /** Check if it is time to run the client task */
     static uint32_t timeLastRunMs = 0;
     uint32_t currentTimeMs = to_ms_since_boot(get_absolute_time());
-    if (currentTimeMs - timeLastRunMs < CLIENT_TASK_TIMEOUT_MS)
+    /** time passed */
+
+    // clang-format off
+    uint32_t timePassedMs = currentTimeMs < timeLastRunMs
+                                ? UINT32_MAX - timeLastRunMs + currentTimeMs
+                                : currentTimeMs - timeLastRunMs;
+    // clang-format on
+
+    if (timePassedMs < CLIENT_TASK_TIMEOUT_MS)
     {
         return 0;
     }
+    
     /** Update the last run time and catch the roll-over */
-    timeLastRunMs = currentTimeMs < timeLastRunMs ? UINT32_MAX - timeLastRunMs + currentTimeMs : currentTimeMs;
+    timeLastRunMs = currentTimeMs;
 
     /** poll the cwy43 arch to process any incoming data */
     // cyw43_arch_poll(); already ran in wifi_task
@@ -131,8 +140,8 @@ static int _client_open(client_t *client)
 
     printf("Connecting to %s:%d\n", ipaddr_ntoa(&client->remote_addr), SERVER_PORT);
 
-    /** 
-     * @warning lwip is not thread safe so surround calls into lwip with 
+    /**
+     * @warning lwip is not thread safe so surround calls into lwip with
      *          cyw43_arch_lwip_begin() and cyw43_arch_lwip_end
      */
 
