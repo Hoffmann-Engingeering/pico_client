@@ -53,7 +53,7 @@ int main()
     printf("Wi-Fi initialised\n");
 
     /** Initialise the client with the server IP address */
-    client_t client;
+    client_t client = {0};
     if (client_init(&client, TCP_SERVER_IP) != 0)
     {
         printf("Failed to initialise client\n");

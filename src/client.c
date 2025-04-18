@@ -27,6 +27,9 @@ int client_init(client_t *client, const char *ip_address)
         return -1;
     }
 
+    /** Initialise the client structure to empty */
+    memset(client, 0, sizeof(client_t));
+
     /** Initialise client with the server ip address */
     _client_ip_string_to_ip_addr(ip_address, &client->remote_addr);
 
