@@ -62,7 +62,13 @@ int wifi_task(void)
     static uint32_t timeLastRunMs = 0;
     uint32_t currentTimeMs = to_ms_since_boot(get_absolute_time());
 
-    if (currentTimeMs - timeLastRunMs < WIFI_TASK_INTERVAL_MS)
+    // clang-format off
+    uint32_t timePassedMs = currentTimeMs < timeLastRunMs
+                            ? UINT32_MAX - timeLastRunMs + currentTimeMs
+                            : currentTimeMs - timeLastRunMs;
+    // clang-format on
+
+    if (timePassedMs < WIFI_TASK_INTERVAL_MS)
     {
         return 0;
     }
