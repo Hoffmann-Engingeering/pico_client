@@ -6,6 +6,10 @@
 #define CLIENT_TASK_TIMEOUT_MS 100
 #define CLIENT_CONNECT_TIMEOUT_MS 4000
 
+#ifndef MQTT_TOPIC_LENGTH
+#define MQTT_TOPIC_LENGTH 100
+#endif
+
 /** Typedefs *************************************************************************************/
 /** Variables ************************************************************************************/
 /** Prototypes ***********************************************************************************/
@@ -29,6 +33,11 @@ int client_init(client_t *client, const char *ip_address)
 
     /** Initialise the client structure to empty */
     memset(client, 0, sizeof(client_t));
+
+    /** Configure the mqtt */
+    client->mqtt_client_info.client_id = CLIENT_ID;
+    client->mqtt_client_info.keep_alive = 60;   // Keep alive time in seconds
+    client->mqtt_client_info.will_topic = NULL; // No will topic
 
     /** Initialise client with the server ip address */
     _client_ip_string_to_ip_addr(ip_address, &client->remote_addr);
@@ -60,7 +69,7 @@ int client_task(client_t *client)
     {
         return 0;
     }
-    
+
     /** Update the last run time and catch the roll-over */
     timeLastRunMs = currentTimeMs;
 

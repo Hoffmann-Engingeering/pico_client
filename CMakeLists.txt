@@ -60,6 +60,7 @@ target_include_directories(pico_client PRIVATE
 # Add any user requested libraries
 target_link_libraries(pico_client 
         pico_cyw43_arch_lwip_poll
+        pico_lwip_mqtt
         )
 
 pico_add_extra_outputs(pico_client)
@@ -68,6 +69,8 @@ pico_add_extra_outputs(pico_client)
 add_compile_definitions(
         SSID="pico_test"
         PASSWORD="password123"
-        TCP_SERVER_IP="192.168.137.1"
+        SERVER_IP="192.168.137.1"
+        CLIENT_ID="pico_client"
+        MQTT_PORT=1883
 )
 
