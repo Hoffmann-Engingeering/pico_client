@@ -8,6 +8,10 @@
 #ifndef NO_SYS
 #define NO_SYS                      1
 #endif
+
+// Need this to be able to use the lwip sys timeouts, otherwise panic
+#define MEMP_NUM_SYS_TIMEOUT        (LWIP_NUM_SYS_TIMEOUT_INTERNAL+1)
+
 // allow override in some examples
 #ifndef LWIP_SOCKET
 #define LWIP_SOCKET                 0

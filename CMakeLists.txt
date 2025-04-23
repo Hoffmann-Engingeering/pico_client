@@ -36,7 +36,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 add_executable(pico_client 
-        src/client.c
+        src/mqtt_client.c
         src/wifi.c
         src/main.c )
 

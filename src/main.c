@@ -3,7 +3,7 @@
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
 
-#include "client.h"
+#include "mqtt_client.h"
 #include "wifi.h"
 
 #ifdef CYW43_WL_GPIO_LED_PIN
@@ -53,12 +53,13 @@ int main()
     printf("Wi-Fi initialised\n");
 
     /** Initialise the client with the server IP address */
-    client_t client = {0};
-    if (client_init(&client, SERVER_IP) != 0)
-    {
-        printf("Failed to initialise client\n");
-        return -1;
-    }
+    /** Ensure that the client data is initialised to 0 */
+    static MqttClientData_t client = {0};
+    // if (client_init(&client, SERVER_IP) != 0)
+    // {
+    //     printf("Failed to initialise client\n");
+    //     return -1;
+    // }
 
     printf("Client initialised\n");
 
@@ -77,23 +78,23 @@ int main()
             pico_set_led(true);
 
             /** Run the client task to check if we are connected */
-            if (client_task(&client) != 0)
+            if (mqtt_client_task(&client) != 0)
             {
                 printf("Failed to run client task\n");
             }
 
             /** Check if we have data */
-            if (client.buffer_len > 0)
-            {
-                printf("Received data: %s\n", client.buffer);
-                memset(client.buffer, 0, sizeof(client.buffer)); // Clear the buffer
-                client.buffer_len = 0;                           // Reset the buffer length after processing
-            }
+            // if (client.buffer_len > 0)
+            // {
+            //     printf("Received data: %s\n", client.buffer);
+            //     memset(client.buffer, 0, sizeof(client.buffer)); // Clear the buffer
+            //     client.buffer_len = 0;                           // Reset the buffer length after processing
+            // }
         }
         else
         {
             /** Set the client task to disconnected */
-            client.state = CLIENT_DISCONNECTED;
+            client.taskState = MQTT_CLIENT_DISCONNECTED;
             /** Blink the LED if not connected */
             led_task();
         }

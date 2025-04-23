@@ -17,43 +17,11 @@
 //
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
-#include "pico/unique_id.h"
-#include "hardware/gpio.h"
-#include "hardware/irq.h"
-#include "hardware/adc.h"
-#include "lwip/apps/mqtt.h"
-#include "lwip/apps/mqtt_priv.h" // needed to set hostname
-#include "lwip/dns.h"
-#include "lwip/altcp_tls.h"
 
-#ifndef MQTT_TOPIC_LEN
-#define MQTT_TOPIC_LEN 100
-#endif
 
-typedef enum
-{
-    MQTT_CLIENT_DISCONNECTED,
-    MQTT_CLIENT_CONNECTING,
-    MQTT_CLIENT_CONNECTED,
-    MQTT_CLIENT_SUBSCRIBED,
-} mqtt_client_state_t;
 
-typedef struct
-{
-    mqtt_client_t *mqttClientInst;
-    struct mqtt_connect_client_info_t mqttClientInfo;
-    char data[MQTT_OUTPUT_RINGBUF_SIZE];
-    char topic[MQTT_TOPIC_LEN];
-    uint32_t len;
-    ip_addr_t mqtt_server_address;
-    bool connect_done;
-    int subscribe_count;
-    bool stop_client;
-    mqtt_client_state_t taskState;
-} MqttClientData_t;
 
-/** Ensure that the client data is initialised to 0 */
-static MqttClientData_t MqttClient = {0};
+
 
 #ifndef DEBUG_printf
 #ifndef NDEBUG
@@ -71,18 +39,7 @@ static MqttClientData_t MqttClient = {0};
 #define ERROR_printf printf
 #endif
 
-// keep alive in seconds
-#define MQTT_KEEP_ALIVE_S 60
 
-// qos passed to mqtt_subscribe
-// At most once (QoS 0)
-// At least once (QoS 1)
-// Exactly once (QoS 2)
-#define MQTT_SUBSCRIBE_QOS 1
-#define MQTT_PUBLISH_QOS 1
-#define MQTT_PUBLISH_RETAIN 0
-
-#define MQTT_CLIENT_TASK_TIMEOUT_ms 100
 
 static void pub_request_cb(__unused void *arg, err_t err)
 {
@@ -126,9 +83,14 @@ static void sub_unsub_topics(MqttClientData_t *state, bool sub)
     // Subscribe to topics
     INFO_printf("Subscribing to topics\n");
     mqtt_request_cb_t cb = sub ? sub_request_cb : unsub_request_cb;
-    
+
     /** TODO: Need to connect one at a time and then verify connected. */
-    mqtt_sub_unsub(state->mqttClientInst, "/led", MQTT_SUBSCRIBE_QOS, cb, state, sub);
+    if( ERR_OK != mqtt_sub_unsub(state->mqttClientInst, "led", MQTT_SUBSCRIBE_QOS, cb, state, sub)) {
+        ERROR_printf("Failed to subscribe to topic\n");
+    }
+    else {
+        INFO_printf("Subscribed to topic led\n");
+    }
 }
 
 static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t flags)
@@ -145,35 +107,33 @@ static void mqtt_incoming_data_cb(void *arg, const u8_t *data, u16_t len, u8_t f
     state->len = len;
     state->data[len] = '\0';
 
-    DEBUG_printf("Topic: %s, Message: %s\n", state->topic, state->data);
+    INFO_printf("Topic: %s, Message: %s\n", state->topic, state->data);
 }
 
 static void mqtt_incoming_publish_cb(void *arg, const char *topic, u32_t tot_len)
 {
     MqttClientData_t *state = (MqttClientData_t *)arg;
-    strncpy(state->topic, topic, sizeof(state->topic));
+    INFO_printf("Incoming publish topic: %s, length: %d\n", topic, tot_len);
 }
 
 static void mqtt_connection_cb(mqtt_client_t *client, void *arg, mqtt_connection_status_t status)
 {
     MqttClientData_t *state = (MqttClientData_t *)arg;
 
-    if (status == MQTT_CONNECT_ACCEPTED)
-    {
+     if (status == MQTT_CONNECT_ACCEPTED)
+     {
         INFO_printf("Connected to mqtt server\n");
         state->connect_done = true;
         sub_unsub_topics(state, true); // subscribe;
     }
     else if (status == MQTT_CONNECT_DISCONNECTED)
     {
-        if (!state->connect_done)
-        {
-            panic("Failed to connect to mqtt server");
-        }
+        INFO_printf("Disconnected from mqtt server\n");
     }
     else
     {
-        panic("Unexpected status");
+        INFO_printf("mqtt_connection_cb error %d\n", status);
+        
     }
 }
 
@@ -193,8 +153,17 @@ static void start_client(MqttClientData_t *state)
     memset(state, 0, sizeof(MqttClientData_t));
 
     state->mqttClientInfo.client_id = CLIENT_ID;          /** See CMakeLists.txt */
-    state->mqttClientInfo.keep_alive = MQTT_KEEP_ALIVE_S; // Keep alive in sec
-    state->mqttClientInfo.will_topic = NULL;
+    state->mqttClientInfo.keep_alive = 60; // Keep alive in sec
+    state->mqttClientInfo.will_topic = "boot";
+    state->mqttClientInfo.will_msg = "booted";
+    state->mqttClientInfo.will_qos = MQTT_PUBLISH_QOS;
+    state->mqttClientInfo.will_retain = MQTT_PUBLISH_RETAIN;
+
+
+    /** Convert the string IP address to an ip4 address  */
+    if(!ipaddr_aton(SERVER_IP, &state->mqtt_server_address)) {
+        panic("Failed to convert IP address %s", SERVER_IP);
+    }
 
     state->mqttClientInst = mqtt_client_new();
     if (!state->mqttClientInst)
@@ -204,17 +173,16 @@ static void start_client(MqttClientData_t *state)
     INFO_printf("IP address of this device %s\n", ipaddr_ntoa(&(netif_list->ip_addr)));
     INFO_printf("Connecting to mqtt server at %s\n", ipaddr_ntoa(&state->mqtt_server_address));
 
-    cyw43_arch_lwip_begin();
-    if (mqtt_client_connect(state->mqttClientInst, &state->mqtt_server_address, port, mqtt_connection_cb, state, &state->mqttClientInfo) != ERR_OK)
+    if (mqtt_client_connect(state->mqttClientInst, &state->mqtt_server_address, MQTT_PORT, mqtt_connection_cb, state, &state->mqttClientInfo) != ERR_OK)
     {
         panic("MQTT broker connection error");
     }
-
+    
+    INFO_printf("MQTT set callbacks\n");
     mqtt_set_inpub_callback(state->mqttClientInst, mqtt_incoming_publish_cb, mqtt_incoming_data_cb, state);
-    cyw43_arch_lwip_end();
 }
 
-int mqtt_client_task(void)
+int mqtt_client_task(MqttClientData_t *client)
 {
 
     /** Implement state machine with timeout and rollover protection */
@@ -235,33 +203,31 @@ int mqtt_client_task(void)
     /** Update the last run time and catch the roll-over */
     timeLastRunMs = currentTimeMs;
 
-    switch (MqttClient.taskState)
+    switch (client->taskState)
     {
     case MQTT_CLIENT_DISCONNECTED:
-        start_client(&MqttClient);
-        MqttClient.taskState = MQTT_CLIENT_CONNECTING;
+        start_client(client);
+        client->taskState = MQTT_CLIENT_CONNECTING;
         break;
     case MQTT_CLIENT_CONNECTING:
-        if (MqttClient.connect_done)
+        if (client->connect_done)
         {
             /** We are connected yay */
-            MqttClient.taskState = MQTT_CLIENT_CONNECTED;
+            client->taskState = MQTT_CLIENT_CONNECTED;
             INFO_printf("MQTT client connected\n");
+            
+            /** TODO: CH - Remove this test message */
+            mqtt_publish(client->mqttClientInst, "led", "ON", 2, MQTT_PUBLISH_QOS, MQTT_PUBLISH_RETAIN, pub_request_cb, client);
         }
         break;
-        /* code */
+
+    case MQTT_CLIENT_CONNECTED:
+        /** Nothing to do atm */
         break;
 
     default:
         break;
     }
 
-    while (!state.connect_done || mqtt_client_is_connected(state.mqttClientInst))
-    {
-        cyw43_arch_poll();
-        cyw43_arch_wait_for_work_until(make_timeout_time_ms(10000));
-    }
-
-    INFO_printf("mqtt client exiting\n");
     return 0;
 }
