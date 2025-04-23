@@ -1,5 +1,7 @@
 /** Includes *************************************************************************************/
 #include "mqtt_client.h"
+
+#include "hardware/adc.h"
 /** Defines **************************************************************************************/
 /** Typedefs *************************************************************************************/
 /** Variables ************************************************************************************/
@@ -39,7 +41,19 @@
 #define ERROR_printf printf
 #endif
 
+/* References for this implementation:
+ * raspberry-pi-pico-c-sdk.pdf, Section '4.1.1. hardware_adc'
+ * pico-examples/adc/adc_console/adc_console.c */
+ static float read_onboard_temperature_c(const char unit) {
 
+    /* 12-bit conversion, assume max value == ADC_VREF == 3.3 V */
+    const float conversionFactor = 3.3f / (1 << 12);
+
+    float adc = (float)adc_read() * conversionFactor;
+    float tempC = 27.0f - (adc - 0.706f) / 0.001721f;
+
+    return tempC;
+}
 
 static void pub_request_cb(__unused void *arg, err_t err)
 {
@@ -215,14 +229,26 @@ int mqtt_client_task(MqttClientData_t *client)
             /** We are connected yay */
             client->taskState = MQTT_CLIENT_CONNECTED;
             INFO_printf("MQTT client connected\n");
-            
-            /** TODO: CH - Remove this test message */
-            mqtt_publish(client->mqttClientInst, "led", "ON", 2, MQTT_PUBLISH_QOS, MQTT_PUBLISH_RETAIN, pub_request_cb, client);
         }
         break;
 
     case MQTT_CLIENT_CONNECTED:
-        /** Nothing to do atm */
+        /** Send ON message to the led topic every 5 seconds */
+        static int32_t timeout = 5000;
+        if (timeout > 0)
+        {
+            timeout -= MQTT_CLIENT_TASK_TIMEOUT_ms;
+        }
+        else
+        {
+            timeout = 5000;
+            float temp = read_onboard_temperature_c('C');
+            char buffer[20] = {0};
+            sprintf(buffer,"%.2f", temp);
+            INFO_printf("Sending ON message to led topic\n");
+            mqtt_publish(client->mqttClientInst, "led", buffer, strlen(buffer), MQTT_PUBLISH_QOS, MQTT_PUBLISH_RETAIN, pub_request_cb, client);
+        }
+
         break;
 
     default:

@@ -61,6 +61,7 @@ target_include_directories(pico_client PRIVATE
 target_link_libraries(pico_client 
         pico_cyw43_arch_lwip_poll
         pico_lwip_mqtt
+        hardware_adc
         )
 
 pico_add_extra_outputs(pico_client)

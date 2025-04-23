@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "pico/cyw43_arch.h"
+#include "hardware/adc.h"
 
 #include "mqtt_client.h"
 #include "wifi.h"
@@ -32,6 +33,9 @@ int main()
 
     /** Initial sleep to give the user time to plug in an connect to the COM port */
     sleep_ms(5000);
+    adc_init();
+    adc_set_temp_sensor_enabled(true);
+    adc_select_input(4);
 
     /** Initialise the LED */
     // TODO: CH - There is a bug in the driver that when running cyw43_arch_init() twice
