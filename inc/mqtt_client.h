@@ -24,14 +24,27 @@
 
 
 /** Typedefs *************************************************************************************/
+
+/** MQTT client task states */
 typedef enum
 {
     MQTT_CLIENT_DISCONNECTED,
     MQTT_CLIENT_CONNECTING,
     MQTT_CLIENT_CONNECTED,
     MQTT_CLIENT_SUBSCRIBED,
-} mqtt_client_state_t;
+} MqttClientState_t;
 
+/** Available topics to push to */
+typedef enum 
+{
+    MQTT_TOPIC_BOOT,
+    MQTT_TOPIC_TEMP,
+    MQTT_TOPIC_HUMIDITY,
+    MQTT_TOPIC_PRESSURE,
+    MQTT_TOPIC_MAX
+} MqttTopic_t;
+
+/** The client data structure */
 typedef struct
 {
     mqtt_client_t *mqttClientInst;
@@ -43,7 +56,7 @@ typedef struct
     bool connect_done;
     int subscribe_count;
     bool stop_client;
-    mqtt_client_state_t taskState;
+    MqttTopic_t taskState;
 } MqttClientData_t;
 
 

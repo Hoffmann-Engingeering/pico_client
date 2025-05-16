@@ -4,6 +4,8 @@
 #include "hardware/adc.h"
 /** Defines **************************************************************************************/
 /** Typedefs *************************************************************************************/
+#define MQTT_TEMPERATURE_TOPIC CLIENT_ID "/temperature"
+#define MQTT_LED_TOPIC CLIENT_ID "/led"
 /** Variables ************************************************************************************/
 /** Prototypes ***********************************************************************************/
 /** Functions ************************************************************************************/
@@ -244,9 +246,9 @@ int mqtt_client_task(MqttClientData_t *client)
             timeout = 5000;
             float temp = read_onboard_temperature_c('C');
             char buffer[20] = {0};
-            sprintf(buffer,"%.2f", temp);
-            INFO_printf("Sending ON message to led topic\n");
-            mqtt_publish(client->mqttClientInst, "led", buffer, strlen(buffer), MQTT_PUBLISH_QOS, MQTT_PUBLISH_RETAIN, pub_request_cb, client);
+            sprintf(buffer,"{ \"t\": %.2f }", temp);
+            INFO_printf("Sending temperature to topic: %s\n", MQTT_TEMPERATURE_TOPIC);
+            mqtt_publish(client->mqttClientInst, MQTT_TEMPERATURE_TOPIC, buffer, strlen(buffer), MQTT_PUBLISH_QOS, MQTT_PUBLISH_RETAIN, pub_request_cb, client);
         }
 
         break;
